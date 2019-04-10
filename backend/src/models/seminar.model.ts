@@ -1,5 +1,6 @@
 import { Schema, model, Document, Types } from 'mongoose';
 import { ObjectId, MongooseId, parseId } from './model.util';
+import * as Joi from 'joi';
 
 const SeminarInfo = new Schema({
     title: { type: String, required: true },
@@ -18,8 +19,9 @@ const AttendeeField = new Schema({
     },
 
     name: { type: String, required: true },
+    isRequired: { type: Boolean, required: true, default: false },
 
-    fieldType: {
+    inputType: {
         type: String,
         enum: ['text', 'textarea', 'number', 'email', 'checkbox', 'radio', 'select'],
         required: true
@@ -205,4 +207,231 @@ export namespace collaborators {
 
         return await seminar.save();
     }
+}
+
+export namespace attendeeFields {
+    
+    export interface IAttendeeField {
+        _id?: Types.ObjectId,
+    
+        name: string,
+        isRequired: boolean,
+        inputType: string,
+    
+        properties: [{
+            label: string,
+            optionType?: string,
+            config?: {
+                min?: number,
+                max?: number,
+                pattern?: RegExp
+            }
+        }]
+    }
+    
+    export async function update(seminarId: MongooseId, authorId: MongooseId, fields: IAttendeeField[]) {
+        let seminar = await select(seminarId);
+        await collaborators.verify(seminar, authorId, { canEdit: true });
+
+        let semObj = <any> seminar;
+        let usedNames = new Set();
+        for (let field of fields) {
+            if (usedNames.has(field.name)) {
+                throw new Error(`Field names should be unique. The field name ${ field.name } has been used more than once.`);
+            }
+            usedNames.add(field.name);
+            verify(field);
+        }
+
+        semObj.attendeeFields = fields;
+        return await seminar.save();
+    }
+
+    export function verify(field: IAttendeeField): void {
+        switch (field.inputType) {
+            case 'text': case 'textarea': case 'number': case 'email': {
+                switch (field.inputType) {
+                    case 'number': case 'text': {
+                        if (field.properties.length > 1) {
+                            throw new Error(`Property array length for text, number, and email input types cannot be larger than 1. Found ${ field.properties.length }.`);
+                        }
+
+                        break;
+                    }
+                }
+
+                // textarea and email type is an auto-pass since min-max will be ignored
+                return;
+            }
+
+            case 'checkbox': case 'radio': case 'select': {
+                if (field.properties.length < 1) {
+                    throw new Error(`Property array for checkbox, radio, and select cannot have the length of 0.`);
+                }
+
+                let hasInput = false;
+                let usedLabels = new Set();
+
+                for (let i = 0; i < field.properties.length; i++) {
+                    let property = field.properties[i];
+
+                    if (usedLabels.has(property.label)) {
+                        throw new Error(`A label cannot be used more than once. Label ${ property.label } has been used more than once.`);
+                    }
+                    usedLabels.add(property.label);
+
+                    if (!property.label) {
+                        throw new Error(`An option cannot be without a label. Error encountered at index ${ i }.`);
+                    }
+
+                    if (field.inputType === 'select' && property.optionType) {
+                        throw new Error(`Select input types cannot have an input option. Error encountered at index ${ i }.`);
+                    }
+
+                    if (field.inputType !== 'select') {
+                        if (property.optionType) {
+                            if (hasInput) {
+                                throw new Error(`There cannot be more than one input option.`);
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+
+            default: {
+                throw new Error(`Unrecognized attendee field input type '${field.inputType}'.`);
+            }
+        }
+    }
+
+    export function generateJoiSchcema(fields: IAttendeeField[]): Joi.Schema {
+        let schema = <any> {};
+    
+        for (let field of fields) {
+            let fieldSchema = null;
+
+            switch (field.inputType) {
+                case 'number': {
+                    fieldSchema = Joi.number();
+                    if (field.properties.length > 0) {
+                        let config = field.properties[0].config;
+
+                        if (config.max != null) {
+                            fieldSchema.max(config.max);
+                        }
+
+                        if (config.min != null) {
+                            fieldSchema.min(config.min);
+                        }
+                    }
+
+                    break;
+                }
+
+                case 'email': case 'text': case 'textarea': {
+                    fieldSchema = Joi.string();
+                    switch (field.inputType) {
+                        case 'email': {
+                            fieldSchema.email();
+                            break;
+                        }
+
+                        case 'text': {
+                            if (field.properties.length > 0) {
+                                let config = field.properties[0].config;
+        
+                                if (config.max != null) {
+                                    fieldSchema.max(config.max);
+                                }
+        
+                                if (config.min != null) {
+                                    fieldSchema.min(config.min);
+                                }
+                            }
+
+                            break;
+                        }
+                    }
+
+                    break;
+                }
+
+                case 'select': {
+                    let validValues: string[] = [];
+                    for (let prop of field.properties) {
+                        validValues.push(prop.label);
+                    }
+
+                    fieldSchema = Joi.string().valid(validValues);
+
+                    break;
+                }
+
+                case 'radio': {
+                    let validValues: string[] = [];
+
+                    let inputOptionSchema = null;
+
+                    for (let prop of field.properties) {
+                        if (!prop.optionType) {
+                            validValues.push(prop.label);
+                        } else {
+                            inputOptionSchema = prop.optionType === 'number' ? Joi.number() : Joi.string();
+                            if (prop.config.max != null) {
+                                inputOptionSchema.max(prop.config.max);
+                            }
+    
+                            if (prop.config.min != null) {
+                                inputOptionSchema.min(prop.config.min);
+                            }
+                        }
+                    }
+
+                    if (inputOptionSchema) {
+                        fieldSchema = Joi.alternatives().try(inputOptionSchema, Joi.string().valid(validValues));
+                    } else {
+                        fieldSchema = Joi.string().valid(validValues);
+                    }
+
+                    break;
+                }
+
+                case 'checkbox': {
+                    let validValues: string[] = [];
+
+                    let inputOptionSchema = null;
+
+                    for (let prop of field.properties) {
+                        if (!prop.optionType) {
+                            validValues.push(prop.label);
+                        } else {
+                            inputOptionSchema = prop.optionType === 'number' ? Joi.number() : Joi.string();
+                            if (prop.config.max != null) {
+                                inputOptionSchema.max(prop.config.max);
+                            }
+    
+                            if (prop.config.min != null) {
+                                inputOptionSchema.min(prop.config.min);
+                            }
+                        }
+                    }
+
+                    fieldSchema = Joi.array().items(Joi.object({
+                        isInput: Joi.boolean().required(),
+                        value: Joi.alternatives(Joi.string().valid(validValues), inputOptionSchema).required()
+                    }));
+                    break;
+                }
+            }
+
+            schema[field.name] = field.isRequired ? fieldSchema.required() : fieldSchema.allow(null, undefined);
+        }
+
+        return Joi.object(schema);
+    }
+}
+
+export namespace certificate {
+    
 }
