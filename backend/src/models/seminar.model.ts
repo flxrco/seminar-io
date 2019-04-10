@@ -305,7 +305,12 @@ export namespace attendeeFields {
         }
     }
 
-    export function generateJoiSchcema(fields: IAttendeeField[]): Joi.Schema {
+    export async function getSchema(seminarId: MongooseId): Promise<Joi.Schema> {
+        let seminar = <any> await select(seminarId);
+        return generateJoiSchema(seminar.attendeeFields);
+    }
+
+    export function generateJoiSchema(fields: IAttendeeField[]): Joi.Schema {
         let schema = <any> {};
     
         for (let field of fields) {
@@ -433,5 +438,5 @@ export namespace attendeeFields {
 }
 
 export namespace certificate {
-    
+
 }
