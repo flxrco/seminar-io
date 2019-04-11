@@ -1,5 +1,6 @@
 import { Schema, model, Document, Types } from 'mongoose';
 import { ObjectId, MongooseId, parseId } from './model.util';
+import * as User from './user.model';
 import * as Joi from 'joi';
 
 const SeminarInfo = new Schema({
@@ -91,15 +92,15 @@ export async function create(createdBy: MongooseId, seminarData: ISeminarInfo): 
 
 export async function select(seminarId: MongooseId): Promise<Document> {
     seminarId = parseId(seminarId);
-    let seminar = await Seminar.findById(seminarId).exec();
+    let seminar = await Seminar.findOne({ _id: seminarId, deletedAt: null}).exec();
     
     if (seminar == null) {
         throw new Error(`Seminar <${ seminarId.toHexString() }> does not exist.`);
     }
 
-    if (seminar.get('deletedAt') != null) {
-        throw new Error(`Seminar <${ seminarId.toHexString() }> has already been deleted.`);
-    }
+    // if (seminar.get('deletedAt') != null) {
+    //     throw new Error(`Seminar <${ seminarId.toHexString() }> has already been deleted.`);
+    // }
 
     return seminar;
 }
@@ -135,7 +136,7 @@ export namespace collaborators {
             seminar = await select(parseId(<MongooseId> seminar));
         }
 
-        userId = parseId(userId);
+        await User.select(userId);
         
         let collaborators: ISeminarCollaborator[] = (<Document> seminar).toObject().collaborators;
         let collaboratorInfo: ISeminarCollaborator = null;
@@ -172,6 +173,7 @@ export namespace collaborators {
         let existingCollaborator = null;
 
         await verify(seminar, authorId, { canManage: true });
+        await User.select(userId);
 
         try {
             existingCollaborator = await verify(seminarId, userId);

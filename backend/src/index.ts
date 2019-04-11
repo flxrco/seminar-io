@@ -1,6 +1,10 @@
 const express = require("express"),
     app = express();
 
+import { routes } from './routes/index.route';
+
+app.use('', routes);
+
 const SERVER_PORT = 3000;
 
 app.listen(SERVER_PORT, () => {
