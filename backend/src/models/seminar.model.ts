@@ -57,7 +57,10 @@ const SeminarSchema = new Schema({
     collaborators: [SeminarCollaborator],
 
     deletedAt: Date,
-    deletedBy: ObjectId
+    deletedBy: ObjectId,
+
+    archivedAt: Date,
+    archivedBy: ObjectId
 });
 
 const Seminar = model('Seminar', SeminarSchema);
@@ -91,6 +94,10 @@ export async function select(seminarId: MongooseId): Promise<Document> {
     
     if (seminar == null) {
         throw new Error(`Seminar <${seminarId.toString()}> does not exist.`);
+    }
+
+    if (seminar.get('deletedAt') != null) {
+        throw new Error(`Seminar <${ seminarId.toString() }> has already been deleted.`);
     }
 
     return seminar;
@@ -137,6 +144,10 @@ export namespace collaborators {
             }
         }
 
+        if (!collaboratorInfo) {
+            throw new Error(`User <${ collaboratorInfo.userId }> is not a collaborator of seminar <${ (<Document> seminar)._id }>.`);
+        }
+
         if (options) {
             if (options.canEdit && !collaboratorInfo.canEdit) {
                 throw new Error(`Collaborator <${ collaboratorInfo.userId }> does not have edit permissions for seminar <${ (<Document> seminar)._id }>.`);
@@ -145,10 +156,6 @@ export namespace collaborators {
             if (options.canManage && !collaboratorInfo.canManage) {
                 throw new Error(`Collaborator <${ collaboratorInfo.userId }> does not have manage permissions for seminar <${ (<Document> seminar)._id }>.`);
             }
-        }
-
-        if (!collaboratorInfo) {
-            throw new Error(`User <${ collaboratorInfo.userId }> is not a collaborator of seminar <${ (<Document> seminar)._id }>.`);
         }
 
         return collaboratorInfo;
@@ -180,29 +187,40 @@ export namespace collaborators {
         return await seminar.save();
     }
 
-    export async function modify(seminarId: MongooseId, authorId: MongooseId, collaboratorId: MongooseId, options: any): Promise<Document> {
+    interface ICollaboratorOptions {
+        canEdit?: boolean,
+        canManage?: boolean,
+        delete?: boolean
+    }
+
+    export async function modify(seminarId: MongooseId, authorId: MongooseId, collaboratorId: MongooseId, options: ICollaboratorOptions): Promise<Document> {
         let seminar = await select(seminarId);
         collaboratorId = parseId(collaboratorId);
 
         await verify(seminar, authorId, { canManage: true });
         await verify(seminar, collaboratorId);
 
-        let semObj = <any> seminar;
-        let collaboratorInfo = null;
+        let collaborators = <any[]> (<any> seminar).collaborator;
+        let index = -1;
 
-        for (let collaborator of semObj.collaborators) {
-            if (collaboratorId.equals(collaborator.userId)) {
-                collaboratorInfo = collaborator;
+        for (let i = 0; i < collaborators.length; i++) {
+            let curr = collaborators[i];
+            if (collaboratorId.equals(curr.userId)) {
+                index = i;
                 break;
             }
         }
 
         if (options.canEdit != null) {
-            collaboratorInfo.canEdit = options.canEdit;
+            collaborators[index].canEdit = options.canEdit;
         }
 
         if (options.canManage != null) {
-            collaboratorInfo.canManage = options.canManage;
+            collaborators[index].canManage = options.canManage;
+        }
+
+        if (options.delete) {
+            collaborators.splice(index, 1);
         }
 
         return await seminar.save();

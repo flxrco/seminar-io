@@ -5,12 +5,12 @@ import * as Joi from 'joi';
 
 const LoggingSchema = new Schema({
     isBooth: { required: true, type: Boolean },
-    id: Types.ObjectId,
+    id: ObjectId,
     timestamp: { required: true, type: Date, default: Date.now }
 });
 
 const AttendeeSchema = new Schema({
-    seminarId: { required: true, type: Types.ObjectId },
+    seminarId: { required: true, type: ObjectId },
 
     registrationLog: LoggingSchema,
     timeInLog: LoggingSchema,
@@ -67,6 +67,6 @@ export namespace forcedOperation {
     }
 
     export async function modifyAnswers(userId: MongooseId, attendeeId: MongooseId, answers: data): Promise<Document> {
-        
+
     }
 }
