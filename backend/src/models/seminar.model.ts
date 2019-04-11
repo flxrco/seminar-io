@@ -90,14 +90,15 @@ export async function create(createdBy: MongooseId, seminarData: ISeminarInfo): 
 }
 
 export async function select(seminarId: MongooseId): Promise<Document> {
+    seminarId = parseId(seminarId);
     let seminar = await Seminar.findById(seminarId).exec();
     
     if (seminar == null) {
-        throw new Error(`Seminar <${seminarId.toString()}> does not exist.`);
+        throw new Error(`Seminar <${ seminarId.toHexString() }> does not exist.`);
     }
 
     if (seminar.get('deletedAt') != null) {
-        throw new Error(`Seminar <${ seminarId.toString() }> has already been deleted.`);
+        throw new Error(`Seminar <${ seminarId.toHexString() }> has already been deleted.`);
     }
 
     return seminar;
@@ -128,6 +129,8 @@ export namespace collaborators {
     }
 
     export async function verify(seminar: MongooseId | Document, userId: MongooseId, options?: any): Promise<ISeminarCollaborator> {
+        userId = parseId(userId);
+        
         if (!(seminar instanceof Document)) {
             seminar = await select(parseId(<MongooseId> seminar));
         }
@@ -145,16 +148,16 @@ export namespace collaborators {
         }
 
         if (!collaboratorInfo) {
-            throw new Error(`User <${ collaboratorInfo.userId }> is not a collaborator of seminar <${ (<Document> seminar)._id }>.`);
+            throw new Error(`User <${ userId.toHexString() }> is not a collaborator of seminar <${ (<Document> seminar)._id }>.`);
         }
 
         if (options) {
             if (options.canEdit && !collaboratorInfo.canEdit) {
-                throw new Error(`Collaborator <${ collaboratorInfo.userId }> does not have edit permissions for seminar <${ (<Document> seminar)._id }>.`);
+                throw new Error(`Collaborator <${ collaboratorInfo.userId.toHexString() }> does not have edit permissions for seminar <${ (<Document> seminar)._id }>.`);
             }
 
             if (options.canManage && !collaboratorInfo.canManage) {
-                throw new Error(`Collaborator <${ collaboratorInfo.userId }> does not have manage permissions for seminar <${ (<Document> seminar)._id }>.`);
+                throw new Error(`Collaborator <${ collaboratorInfo.userId.toHexString() }> does not have manage permissions for seminar <${ (<Document> seminar)._id }>.`);
             }
         }
 
@@ -162,6 +165,9 @@ export namespace collaborators {
     }
 
     export async function add(seminarId: MongooseId, authorId: MongooseId, userId: MongooseId): Promise<Document> {
+        userId = parseId(userId);
+        seminarId = parseId(userId);
+        
         let seminar = await select(seminarId);
         let existingCollaborator = null;
 
@@ -174,7 +180,7 @@ export namespace collaborators {
         }
 
         if (existingCollaborator) {
-            throw new Error(`User <${ userId.toString() }> is already a collaborator of seminar <${ seminarId.toString() }>.`);
+            throw new Error(`User <${ userId.toHexString() }> is already a collaborator of seminar <${ seminarId.toHexString() }>.`);
         }
 
         (<any> seminar).collaborators.push({
@@ -318,7 +324,7 @@ export namespace attendeeFields {
             }
 
             default: {
-                throw new Error(`Unrecognized attendee field input type '${field.inputType}'.`);
+                throw new Error(`Unrecognized attendee field input type '${ field.inputType }'.`);
             }
         }
     }

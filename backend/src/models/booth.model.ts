@@ -45,14 +45,14 @@ export async function create(seminarId: MongooseId, collaboratorId: MongooseId, 
 }
 
 export async function select(boothId: MongooseId): Promise<Document> {
-    let booth =  <any> await Booth.findById(boothId).exec();
+    let booth = <any> await Booth.findById(boothId).exec();
     
     if (booth == null) {
-        throw new Error(`Booth <${ booth.seminarId }> does not exist.`);
+        throw new Error(`Booth <${ booth.seminarId.toHexString() }> does not exist.`);
     }
 
     if (booth.deletedAt != null) {
-        throw new Error(`Booth <${ booth.seminarId }> has already been deleted.`);
+        throw new Error(`Booth <${ booth.seminarId.toHexString() }> has already been deleted.`);
     }
     
     await seminarSelect(booth.seminarId);
