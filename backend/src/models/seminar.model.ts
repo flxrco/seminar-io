@@ -86,7 +86,7 @@ export async function create(createdBy: MongooseId, seminarData: ISeminarInfo): 
     return await Seminar.create(data);
 }
 
-export async function select(seminarId: MongooseId) {
+export async function select(seminarId: MongooseId): Promise<Document> {
     let seminar = await Seminar.findById(seminarId).exec();
     
     if (seminar == null) {
@@ -229,7 +229,7 @@ export namespace attendeeFields {
         }]
     }
     
-    export async function update(seminarId: MongooseId, authorId: MongooseId, fields: IAttendeeField[]) {
+    export async function update(seminarId: MongooseId, authorId: MongooseId, fields: IAttendeeField[]): Promise<Document> {
         let seminar = await select(seminarId);
         await collaborators.verify(seminar, authorId, { canEdit: true });
 

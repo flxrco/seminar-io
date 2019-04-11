@@ -21,32 +21,52 @@ const AttendeeSchema = new Schema({
 
 const Attendee = model('Attendee', AttendeeSchema);
 
-export async function preRegister(seminarId: MongooseId, data: any) {
+export interface ILog {
+    isBooth: boolean,
+    id: Types.ObjectId,
+    timestamp: Date
+}
+
+export async function preRegister(seminarId: MongooseId, answers: any): Promise<Document> {
     let schema = await attendeeFields.getSchema(seminarId);
-    Joi.validate(data, schema);
+    Joi.validate(answers, schema);
 
     return await Attendee.create({
         seminarId: parseId(seminarId),
         registrationLog: { isBooth: false },
 
-        answers: data
+        answers: answers
     });
 }
 
-export async function onSiteRegister(boothId: MongooseId, data: any) {
+export namespace boothOperation {
+    export async function onSiteRegister(boothId: MongooseId, data: any): Promise<Document> {
+
+    }
+
+    export async function timeIn(boothId: MongooseId, attendeeId: MongooseId): Promise<Document> {
+
+    }
+
+    export async function timeOut(boothId: MongooseId, attendeeId: MongooseId): Promise<Document> {
+
+    }
 }
 
-export async function boothTimeOut(boothId: MongooseId, data: any) {
-}
+export namespace forcedOperation {
+    export async function register(userId: MongooseId, data: any): Promise<Document> {
 
-export async function boothTimeIn(boothId: MongooseId, data: any) {
-}
+    }
+    
+    export async function timeIn(userId: MongooseId, attendeeId: MongooseId): Promise<Document> {
 
-export async function forceTimeIn(seminarId: MongooseId, collaboratorId: MongooseId, data: any) {
-}
+    }
+    
+    export async function timeOut(userId: MongooseId, attendeeId: MongooseId): Promise<Document> {
 
-export async function forceTimeOut(seminarId: MongooseId, collaboratorId: MongooseId, data: any) {
-}
+    }
 
-export async function forceRegister(seminarId: MongooseId, collaboratorId: MongooseId, data: any) {
+    export async function modifyAnswers(userId: MongooseId, attendeeId: MongooseId, answers: data): Promise<Document> {
+        
+    }
 }
