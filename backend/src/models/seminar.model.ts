@@ -49,7 +49,9 @@ const SeminarCollaborator = new Schema({
     addedAt: { type: Date, default: Date.now },
 
     canEdit: { type: Boolean, default: false },
-    canManage: { type: Boolean, default: false }
+    canManage: { type: Boolean, default: false },
+    
+    isOwner: { type: Boolean, default: false }
 }, { _id: false });
 
 const SeminarSchema = new Schema({
@@ -77,44 +79,96 @@ export interface ISeminarInfo {
     }
 }
 
+/**
+ * Creates a seminar and automatically registers the creator as a collaborator (with owner rights, of course)
+ * 
+ * @param createdBy the ObjectId of the person who created the seminar
+ * @param seminarData the data used to build the seminar
+ * 
+ * @returns the newly created seminar document
+ * 
+ * @throws if the userId input in the createdBy parameter has no document associated to it
+ */
 export async function create(createdBy: MongooseId, seminarData: ISeminarInfo): Promise<Document> {
     createdBy = parseId(createdBy);
+
+    // this will cause an errror to be thrown if the user is nonexistent
+    // this block interrupts the code
+    await User.select(createdBy);
 
     let data: any = seminarData;
     data.collaborators = [{
         userId: createdBy,
         canEdit: true,
-        canManage: true
+        canManage: true,
+        isOwner: true
     }];
 
     return await Seminar.create(data);
 }
 
+/**
+ * Returns the document of the seminar associated with the input seminarId.
+ * 
+ * @throws if there is no document associated with the seminarId or if the document is flagged as deleted
+ * @param seminarId the ObjectId of the seminar to be pulled up
+ * 
+ * @returns The document of the seminar
+ */
 export async function select(seminarId: MongooseId): Promise<Document> {
     seminarId = parseId(seminarId);
-    let seminar = await Seminar.findOne({ _id: seminarId, deletedAt: null}).exec();
+    let seminar = await Seminar.findById(seminarId).exec();
     
-    if (seminar == null) {
+    // this code block can throw an error and interrupt the code
+    if (seminar == null || seminar.get('deletedAt', Date) != null) { // throw an error if flag as deleted or nonexistent
         throw new Error(`Seminar <${ seminarId.toHexString() }> does not exist.`);
     }
-
-    // if (seminar.get('deletedAt') != null) {
-    //     throw new Error(`Seminar <${ seminarId.toHexString() }> has already been deleted.`);
-    // }
 
     return seminar;
 }
 
-export async function remove(seminarId: MongooseId, authorId: MongooseId): Promise<Document> {
+/**
+ * Flags a seminar as deleted. The deleted seminar will not show up in select nor index anymore.
+ * @param seminarId the ObjectId of the seminar to be deleted
+ * @param authorId the ObjectId of the collaborator (must be owner)
+ * 
+ * @returns the OBJECT of the removed seminar
+ * 
+ * @throws if the seminarId is nonexistent or if the collaborator is not the owner, or if the user is not a collaborator at all
+ */
+export async function remove(seminarId: MongooseId, authorId: MongooseId): Promise<any> {
     seminarId = parseId(seminarId);
-    await collaborators.verify(seminarId, authorId);
-    return await Seminar.findByIdAndUpdate(seminarId, { $set: { deletedBy: seminarId, deletedAt: new Date() } }).exec();
+    authorId = parseId(authorId);
+    
+    // this line can interrupt the code. will throw an error if the seminar is nonexistent
+    let seminar = await select(seminarId);
+
+    // this block can also interrupt the flow. will throw an error if not a collaborator, or if the collaborator is not the owner
+    await collaborators.verify(seminar, authorId, { isOwner: true }); // the isOwner flag is included so that the verify() call will throw an error if the user is not the owner
+    
+    seminar.set('deletedBy', authorId);
+    seminar.set('deletedAt', Date.now());
+
+    return (await seminar.save()).toObject();
 }
 
-export async function updateInfo(seminarId: MongooseId, authorId: MongooseId, data: ISeminarInfo): Promise<Document> {
+/**
+ * Updates the info subdocument of a seminar
+ * @param seminarId the seminar to be updated
+ * @param collaboratorId the id of the one editing
+ * @param data the new info of the seminar
+ * 
+ * @returns the newly edited seminar document
+ * 
+ * @throws if the seminarId is nonexistent, or if the user does not have edit rights over this seminar
+ */
+export async function updateInfo(seminarId: MongooseId, collaboratorId: MongooseId, data: ISeminarInfo): Promise<Document> {
     seminarId = parseId(seminarId);
-    await collaborators.verify(seminarId, authorId);
-    return await Seminar.findByIdAndUpdate(seminarId, { $set: { info: data } }).exec();
+
+    // this line will throw if the user does not have edit rights for this seminar or if the seminar is nonexistent
+    await collaborators.verify(seminarId, collaboratorId, { canEdit: true });
+
+    return await Seminar.findByIdAndUpdate(seminarId, { $set: data }).exec();
 }
 
 export namespace collaborators {
@@ -126,10 +180,17 @@ export namespace collaborators {
         createdAt: Date,
 
         canEdit: boolean,
-        canManage: boolean
+        canManage: boolean,
+        isOwner: boolean
     }
 
-    export async function verify(seminar: MongooseId | Document, userId: MongooseId, options?: any): Promise<ISeminarCollaborator> {
+    interface ICollaboratorVerifyOptions {
+        canEdit?: boolean,
+        canManage?: boolean,
+        isOwner?: boolean
+    }
+
+    export async function verify(seminar: MongooseId | Document, userId: MongooseId, options?: ICollaboratorVerifyOptions): Promise<ISeminarCollaborator> {
         userId = parseId(userId);
         
         if (!(seminar instanceof Document)) {
@@ -153,11 +214,15 @@ export namespace collaborators {
         }
 
         if (options) {
-            if (options.canEdit && !collaboratorInfo.canEdit) {
+            if (options.isOwner && !collaboratorInfo.isOwner) {
+                throw new Error(`Collaborator <${ collaboratorInfo.userId.toHexString() }> is not the owner of seminar <${ (<Document> seminar)._id }>.`);
+            }
+            
+            if (options.canEdit && !collaboratorInfo.canEdit && !collaboratorInfo.isOwner) {
                 throw new Error(`Collaborator <${ collaboratorInfo.userId.toHexString() }> does not have edit permissions for seminar <${ (<Document> seminar)._id }>.`);
             }
 
-            if (options.canManage && !collaboratorInfo.canManage) {
+            if (options.canManage && !collaboratorInfo.canManage && !collaboratorInfo.isOwner) {
                 throw new Error(`Collaborator <${ collaboratorInfo.userId.toHexString() }> does not have manage permissions for seminar <${ (<Document> seminar)._id }>.`);
             }
         }
