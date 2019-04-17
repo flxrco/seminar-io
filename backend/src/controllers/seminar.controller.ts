@@ -2,25 +2,30 @@ import * as Seminar from '../models/seminar.model';
 
 export async function select(req: any, res: any) {
     try {
-        let seminar = (await Seminar.select(req.params.seminarId)).toObject();
+        let seminar = await Seminar.select(req.params.seminarId);
         let collaborator = null;
         
         try {
             collaborator = await Seminar.collaborators.verify(seminar, req.user._id);
         } catch (err) {
-            // do nothing, just catch
+            console.log(err);
         }
 
-        delete seminar.certificateFields;
-        delete seminar.attendeeFields;
+        let obj = seminar.toObject();
 
-        if (collaborator) {
-            delete seminar.collaborators;
+        delete obj.certificateFields;
+        delete obj.attendeeFields;
+
+        if (!collaborator) {
+            delete obj.collaborators;
+        } else {
+            obj.collaborators = await Seminar.collaborators.index(seminar._id);
+            console.log(obj.collaborators);
         }
 
-        res.send({ ...seminar, collaboratorInfo: collaborator });
+        res.send({ ...obj, collaboratorInfo: collaborator });
     } catch (err) {
-        res.status(400).send(err);
+        res.status(400).send(err.message);
     }
 }
 
@@ -28,13 +33,9 @@ export namespace organizer {
     export async function create(req: any, res: any) {
         try {
             let seminar = await Seminar.create(req.user._id, req.body);
-            res.status(210).send(seminar.toObject());
+            res.status(201).send(seminar.toObject());
         } catch (err) {
-            res.status(400).send(err);
+            res.status(400).send(err.message);
         }
     }
-}
-
-export namespace guest {
-
 }

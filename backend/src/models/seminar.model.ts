@@ -1,26 +1,27 @@
-import { Schema, model, Document, Types } from 'mongoose';
-import { ObjectId, MongooseId, parseId, generateId } from './model.util';
+import { Schema, model, Document, Types, MongooseDocument } from 'mongoose';
+import { ObjectId, MongooseId, parseId, generateId } from '../utils/model.util';
 import * as User from './user.model';
 import * as Joi from 'joi';
+
+const Schedule = new Schema({
+    start: { type: Date, required: true },
+    end: { type: Date, required: true }
+}, { _id: false })
 
 const SeminarInfo = new Schema({
     title: { type: String, required: true }, // every seminar must have a title
     description: String, // description can be optional
-    schedule: { // if you provide a schedule, the start and end times must be provided
-        start: { type: Date, required: true },
-        end: { type: Date, required: true }
-    }
+    schedule: Schedule // if you provide a schedule, the start and end times must be provided
 }, { _id: false });
 
 const AttendeeField = new Schema({
     _id: {
         type: ObjectId,
-        requried: true,
         default: generateId
     },
 
     name: { type: String, required: true },
-    isRequired: { type: Boolean, required: true, default: false },
+    isRequired: { type: Boolean, default: false },
 
     inputType: {
         type: String,
@@ -37,7 +38,7 @@ const AttendeeField = new Schema({
         config: {
             min: Number,
             max: Number,
-            pattern: RegExp
+            pattern: String
         }
     }]
 }, { _id: false });
@@ -65,6 +66,8 @@ const SeminarSchema = new Schema({
     archivedAt: Date,
     archivedBy: ObjectId
 });
+
+SeminarSchema.set('toObject', { minimize: false, versionKey: false });
 
 const Seminar = model('Seminar', SeminarSchema);
 
@@ -97,14 +100,14 @@ export async function create(createdBy: MongooseId, seminarData: ISeminarInfo): 
     await User.select(createdBy);
 
     let data: any = seminarData;
-    data.collaborators = [{
+    let collaborators = [{
         userId: createdBy,
         canEdit: true,
         canManage: true,
         isOwner: true
     }];
 
-    return await Seminar.create(data);
+    return await Seminar.create({ info: data, collaborators: collaborators });
 }
 
 /**
@@ -192,8 +195,8 @@ export namespace collaborators {
 
     export async function verify(seminar: MongooseId | Document, userId: MongooseId, options?: ICollaboratorVerifyOptions): Promise<ISeminarCollaborator> {
         userId = parseId(userId);
-        
-        if (!(seminar instanceof Document)) {
+
+        if (seminar instanceof String || seminar instanceof Types.ObjectId) {
             seminar = await select(parseId(<MongooseId> seminar));
         }
 
@@ -209,21 +212,24 @@ export namespace collaborators {
             }
         }
 
+        let seminarId = (<Document> seminar)._id.toHexString();
+
         if (!collaboratorInfo) {
-            throw new Error(`User <${ userId.toHexString() }> is not a collaborator of seminar <${ (<Document> seminar)._id }>.`);
+            throw new Error(`User <${ userId.toHexString() }> is not a collaborator of seminar <${ seminarId }>.`);
         }
 
         if (options) {
+            let collaboratorId = collaboratorInfo.userId.toHexString();
             if (options.isOwner && !collaboratorInfo.isOwner) {
-                throw new Error(`Collaborator <${ collaboratorInfo.userId.toHexString() }> is not the owner of seminar <${ (<Document> seminar)._id }>.`);
+                throw new Error(`Collaborator <${ collaboratorId }> is not the owner of seminar <${ seminarId }>.`);
             }
             
             if (options.canEdit && !collaboratorInfo.canEdit && !collaboratorInfo.isOwner) {
-                throw new Error(`Collaborator <${ collaboratorInfo.userId.toHexString() }> does not have edit permissions for seminar <${ (<Document> seminar)._id }>.`);
+                throw new Error(`Collaborator <${ collaboratorId }> does not have edit permissions for seminar <${ seminarId }>.`);
             }
 
             if (options.canManage && !collaboratorInfo.canManage && !collaboratorInfo.isOwner) {
-                throw new Error(`Collaborator <${ collaboratorInfo.userId.toHexString() }> does not have manage permissions for seminar <${ (<Document> seminar)._id }>.`);
+                throw new Error(`Collaborator <${ collaboratorId }> does not have manage permissions for seminar <${ seminarId }>.`);
             }
         }
 
@@ -297,6 +303,37 @@ export namespace collaborators {
         }
 
         return await seminar.save();
+    }
+
+    export async function index(seminarId: MongooseId): Promise<any[]> {
+        let seminar = await select(seminarId);
+        let collaborators: MongooseId[] = [];
+
+        seminar.get('collaborators').forEach((collaborator: any) => {
+            collaborators.push(collaborator.userId);
+        });
+
+        let users: Document[] = await User.batchSelect(collaborators);
+        let userMap = <any> {};
+        
+        users.forEach((user: Document) => {
+            let obj = user.toObject();
+            
+            delete obj.password;
+            delete obj.verificationId;
+            delete obj.connections;
+            delete obj.registeredAt;
+
+            userMap[obj._id.toHexString()] = obj;
+        });
+
+        let seminarObj = seminar.toObject();
+
+        seminarObj.collaborators.forEach((collaborator: any) => {
+            collaborator.user = userMap[collaborator.userId.toHexString()];
+        });
+
+        return seminarObj.collaborators;
     }
 }
 

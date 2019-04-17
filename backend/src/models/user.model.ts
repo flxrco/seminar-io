@@ -67,6 +67,20 @@ export async function select(userId: MongooseId): Promise<Document> {
     return user;
 }
 
+export async function batchSelect(userIds: MongooseId[]): Promise<Document[]> {
+    for (let i = 0; i < userIds.length; i++) {
+        userIds[i] = parseId(userIds[i]);
+    }
+
+    let users = await User.find({ _id: { $in: userIds }, deletedAt: null }).exec();
+
+    if (users.length !== userIds.length) {
+        throw new Error(`${userIds.length - users.length} users are nonexistent.`);
+    }
+
+    return users;
+}
+
 export namespace emailVerification {
     export async function verify(verificationId: MongooseId) {
         verificationId = parseId(verificationId);
