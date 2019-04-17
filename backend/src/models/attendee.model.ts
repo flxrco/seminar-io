@@ -1,5 +1,5 @@
-import { Schema, model, Document, Types, SchemaTypes } from 'mongoose';
-import { ObjectId, MongooseId, parseId } from './model.util';
+import { Schema, model, Document, SchemaTypes } from 'mongoose';
+import { ObjectId, MongooseId, parseId } from '../utils/model.util';
 import * as Seminar from './seminar.model';
 import * as Joi from 'joi';
 import * as Booth from './booth.model';
@@ -130,7 +130,7 @@ export namespace boothOperation {
 
 //     }
 
-//     export async function modifyAnswers(userId: MongooseId, attendeeId: MongooseId, answers: data): Promise<Document> {
+//     export async function updateAnswers(userId: MongooseId, attendeeId: MongooseId, answers: data): Promise<Document> {
 
 //     }
 // }

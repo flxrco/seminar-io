@@ -271,7 +271,7 @@ export namespace collaborators {
         delete?: boolean
     }
 
-    export async function modify(seminarId: MongooseId, authorId: MongooseId, collaboratorId: MongooseId, options: ICollaboratorOptions): Promise<Document> {
+    export async function update(seminarId: MongooseId, authorId: MongooseId, collaboratorId: MongooseId, options: ICollaboratorOptions): Promise<Document> {
         let seminar = await select(seminarId);
         collaboratorId = parseId(collaboratorId);
 
