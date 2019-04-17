@@ -71,7 +71,6 @@ SeminarSchema.set('toObject', { minimize: false, versionKey: false });
 
 const Seminar = model('Seminar', SeminarSchema);
 
-
 // SEMINAR CREATION
 export interface ISeminarInfo {
     title: string,
@@ -196,13 +195,13 @@ export namespace collaborators {
     export async function verify(seminar: MongooseId | Document, userId: MongooseId, options?: ICollaboratorVerifyOptions): Promise<ISeminarCollaborator> {
         userId = parseId(userId);
 
-        if (seminar instanceof String || seminar instanceof Types.ObjectId) {
-            seminar = await select(parseId(<MongooseId> seminar));
+        if (typeof seminar === 'string' || seminar instanceof Types.ObjectId) {
+            seminar = await select(<MongooseId> seminar);
         }
 
         await User.select(userId);
         
-        let collaborators: ISeminarCollaborator[] = (<Document> seminar).toObject().collaborators;
+        let collaborators: ISeminarCollaborator[] = (<Document> seminar).get('collaborators');
         let collaboratorInfo: ISeminarCollaborator = null;
         
         for (let collaborator of collaborators) {

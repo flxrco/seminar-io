@@ -8,7 +8,8 @@ export async function select(req: any, res: any) {
         try {
             collaborator = await Seminar.collaborators.verify(seminar, req.user._id);
         } catch (err) {
-            console.log(err);
+            // console.log(err);
+            // do nothing
         }
 
         let obj = seminar.toObject();
@@ -20,7 +21,6 @@ export async function select(req: any, res: any) {
             delete obj.collaborators;
         } else {
             obj.collaborators = await Seminar.collaborators.index(seminar._id);
-            console.log(obj.collaborators);
         }
 
         res.send({ ...obj, collaboratorInfo: collaborator });

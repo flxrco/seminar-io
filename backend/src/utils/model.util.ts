@@ -1,6 +1,6 @@
 import { Types, Schema } from 'mongoose';
 
-export type MongooseId = Types.ObjectId | string; // a utility joint type for ObjectId and string
+export type MongooseId = Types.ObjectId | String; // a utility joint type for ObjectId and string
 
 export let ObjectId = Schema.Types.ObjectId; // this ObjectId refers to the kind that can be used for schemas
 

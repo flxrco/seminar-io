@@ -1,5 +1,5 @@
 import { Schema, model, Document, Types, SchemaTypes } from 'mongoose';
-import { ObjectId, MongooseId, parseId } from './model.util';
+import { ObjectId, MongooseId, parseId } from '../utils/model.util';
 import { select as seminarSelect, collaborators } from './seminar.model';
 
 const BoothSchema = new Schema({
@@ -20,6 +20,8 @@ const BoothSchema = new Schema({
     startAt: Date,
     endAt: { type: Date, required: true }
 });
+
+BoothSchema.set('toObject', { minimize: false, versionKey: false });
 
 const Booth = model('Booth', BoothSchema);
 
@@ -45,19 +47,16 @@ export async function create(seminarId: MongooseId, collaboratorId: MongooseId, 
 }
 
 export async function select(boothId: MongooseId): Promise<Document> {
-    let booth = <any> await Booth.findById(boothId).exec();
+    boothId = parseId(boothId);
+    let booth = await Booth.findById(boothId).exec();
     
-    if (booth == null) {
-        throw new Error(`Booth <${ booth.seminarId.toHexString() }> does not exist.`);
-    }
-
-    if (booth.deletedAt != null) {
-        throw new Error(`Booth <${ booth.seminarId.toHexString() }> has already been deleted.`);
+    if (booth == null || booth.get('deletedAt', Date) != null) {
+        throw new Error(`Booth <${ boothId.toHexString() }> does not exist.`);
     }
     
-    await seminarSelect(booth.seminarId);
+    await seminarSelect(booth.get('seminarId'));
 
-    return <Document> booth;
+    return booth;
 }
 
 export async function verify(boothId: MongooseId, mode: number): Promise<Document> {
