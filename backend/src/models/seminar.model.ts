@@ -307,33 +307,36 @@ export namespace collaborators {
 
     export async function index(seminarId: MongooseId): Promise<any[]> {
         let seminar = await select(seminarId);
-        let collaborators: MongooseId[] = [];
+        let collaboratorIds: MongooseId[] = [];
 
         seminar.get('collaborators').forEach((collaborator: any) => {
-            collaborators.push(collaborator.userId);
+            collaboratorIds.push(collaborator.userId);
         });
 
-        let users: Document[] = await User.batchSelect(collaborators);
+        let users: Document[] = await User.batchSelect(collaboratorIds);
         let userMap = <any> {};
         
         users.forEach((user: Document) => {
             let obj = user.toObject();
-            
+
             delete obj.password;
             delete obj.verificationId;
             delete obj.connections;
             delete obj.registeredAt;
 
             userMap[obj._id.toHexString()] = obj;
+
+            delete obj._id;
         });
 
         let seminarObj = seminar.toObject();
+        let collaborators: any[] = [];
 
         seminarObj.collaborators.forEach((collaborator: any) => {
-            collaborator.user = userMap[collaborator.userId.toHexString()];
+            collaborators.push({ ...collaborator, ...userMap[collaborator.userId.toHexString()] });
         });
 
-        return seminarObj.collaborators;
+        return collaborators;
     }
 }
 
