@@ -1,4 +1,4 @@
-import { Schema, model, Document, Types } from 'mongoose';
+import { Schema, model, Document } from 'mongoose';
 import { ObjectId, MongooseId, parseId, generateId } from './model.util';
 import { hashSync, compareSync } from 'bcryptjs';
 import * as Joi from 'joi';
@@ -16,6 +16,8 @@ const UserSchema = new Schema({
     connections: [ObjectId],
     verificationId: { type: ObjectId, default: generateId }
 });
+
+UserSchema.set('toObject', { minimize: false, versionKey: false });
 
 const User = model('User', UserSchema);
 

@@ -1,12 +1,21 @@
-const express = require("express"),
-    app = express();
-
+import express = require('express');
+import { json, urlencoded } from 'express';
 import { routes } from './routes/index.route';
+import { connect } from 'mongoose';
+
+connect('mongodb://localhost/seminar-io', { useNewUrlParser: true });
+console.log('Connected to MongoDB server.');
+
+const app = express();
+const SERVER_PORT = 3000;
+
+app.use(json());
+app.use(urlencoded({
+    extended: true
+}));
 
 app.use('', routes);
 
-const SERVER_PORT = 3000;
-
 app.listen(SERVER_PORT, () => {
-    console.log(`EXPRESS server listening at port ${SERVER_PORT}`);
+    console.log(`Started express server at port ${SERVER_PORT}.`);
 });
