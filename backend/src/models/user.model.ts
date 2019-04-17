@@ -1,5 +1,5 @@
 import { Schema, model, Document } from 'mongoose';
-import { ObjectId, MongooseId, parseId, generateId } from './model.util';
+import { ObjectId, MongooseId, parseId, generateId } from '../utils/model.util';
 import { hashSync, compareSync } from 'bcryptjs';
 import * as Joi from 'joi';
 

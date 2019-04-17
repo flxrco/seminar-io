@@ -21,3 +21,18 @@ export async function select(req: any, res: any) {
         res.status(400).send(err.message);
     }
 }
+
+export async function authenticate(req: any, res: any) {
+    if (req.isAuthenticated()) {
+        res.send('You are already authenticated.');
+        return;
+    }
+
+    try {
+        req.login(await User.authenticate(req.body.email, req.body.password), (err: any) => {
+            res.send('Authentication successful.');
+        });
+    } catch(err) {
+        res.status(401).send(err.message);
+    }
+}
