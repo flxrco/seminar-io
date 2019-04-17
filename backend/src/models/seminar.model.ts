@@ -1,14 +1,14 @@
 import { Schema, model, Document, Types } from 'mongoose';
-import { ObjectId, MongooseId, parseId } from './model.util';
+import { ObjectId, MongooseId, parseId, generateId } from './model.util';
 import * as User from './user.model';
 import * as Joi from 'joi';
 
 const SeminarInfo = new Schema({
-    title: { type: String, required: true },
-    description: String,
-    schedule: {
-        start: Date,
-        end: Date
+    title: { type: String, required: true }, // every seminar must have a title
+    description: String, // description can be optional
+    schedule: { // if you provide a schedule, the start and end times must be provided
+        start: { type: Date, required: true },
+        end: { type: Date, required: true }
     }
 }, { _id: false });
 
@@ -16,7 +16,7 @@ const AttendeeField = new Schema({
     _id: {
         type: ObjectId,
         requried: true,
-        default: ObjectId()
+        default: generateId
     },
 
     name: { type: String, required: true },

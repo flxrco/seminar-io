@@ -1,5 +1,5 @@
 import { Schema, model, Document, Types } from 'mongoose';
-import { ObjectId, MongooseId, parseId } from './model.util';
+import { ObjectId, MongooseId, parseId, generateId } from './model.util';
 import { hashSync, compareSync } from 'bcryptjs';
 import * as Joi from 'joi';
 
@@ -14,7 +14,7 @@ const UserSchema = new Schema({
     deletedAt: Date,
 
     connections: [ObjectId],
-    verificationId: { type: ObjectId, default: ObjectId() }
+    verificationId: { type: ObjectId, default: generateId }
 });
 
 const User = model('User', UserSchema);
@@ -75,7 +75,7 @@ export namespace emailVerification {
         return await user.save();
     }
 
-    export async function generateId(userId: MongooseId) {
+    export async function regenerateId(userId: MongooseId) {
         userId = parseId(userId);
         let user = <any> await select(userId);
 
@@ -83,7 +83,7 @@ export namespace emailVerification {
             throw new Error(`User <${ userId.toHexString() }> has already been verified.`);
         }
 
-        user.verificationid = ObjectId();
+        user.verificationid = generateId();
 
         return await (<Document> user).save();
     }
