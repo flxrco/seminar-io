@@ -4,7 +4,7 @@ import { routes } from './routes/index.route';
 import { connect } from 'mongoose';
 
 connect('mongodb://localhost/seminar-io', { useNewUrlParser: true });
-console.log('Connected to MongoDB server.');
+console.log('MongoDB-Mongoose connection successful.');
 
 const app = express();
 const SERVER_PORT = 3000;

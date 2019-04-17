@@ -34,7 +34,7 @@ export async function create(newUser: any): Promise<Document> {
     Joi.validate(newUser, UserJoiSchema);
 
     // check if email is unique
-    let dupes = await User.find({ email: newUser.email }).exec();
+    let dupes = await User.find({ email: newUser.email, deletedAt: null }).exec();
     if (dupes.length > 0) {
         throw new Error(`The email ${ newUser.email } has already been taken by another user.`);
     }
