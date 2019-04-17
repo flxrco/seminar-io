@@ -77,7 +77,7 @@ interface IBoothOptions {
     mode?: number
 }
 
-export async function modify(boothId: MongooseId, collaboratorId: MongooseId, options: IBoothOptions): Promise<Document> {
+export async function update(boothId: MongooseId, collaboratorId: MongooseId, options: IBoothOptions): Promise<Document> {
     let booth = <any> await select(boothId);
     await collaborators.verify(booth.seminarId, collaboratorId, { canEdit: true });
 
