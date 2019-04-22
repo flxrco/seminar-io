@@ -119,7 +119,7 @@ export namespace authentication {
 
     export async function authenticate(boothId: MongooseId, key: MongooseId) {
         boothId = parseId(boothId);
-        let boothIdString = boothId.toHexString();
+        let boothIdString = boothId.toString();
         let booth = await select(boothId);
 
         // check booth end time
@@ -128,6 +128,10 @@ export namespace authentication {
 
         if (!authObject) {
             throw new Error(`Booth <${ boothIdString }> has not yet been given an authentication key.`);
+        }
+
+        if (!authObject.key.equals(key)) {
+            throw new Error(`Incorrect key entered for Booth <${ boothIdString }>.`);
         }
 
         delete authKeys[boothIdString];

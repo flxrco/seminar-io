@@ -46,10 +46,10 @@ export namespace authentication {
 
     export async function authenticate(req: any, res: any) {
         try {
-            let booth = <any> await Booth.authentication.authenticate(req.params.boothId, req.params.key);
-            req.session.boothId = booth.boothId.toHexString();
+            let booth = <any> await Booth.authentication.authenticate(req.body.boothId, req.body.key);
+            req.session.boothId = booth._id.toHexString();
 
-            req.send(`Successfully authenticated booth ${ req.paras.boothid }.`);
+            res.send(`Successfully authenticated booth ${ req.params.boothId }.`);
         } catch (err) {
             res.status(400).send(err.message);
         }
