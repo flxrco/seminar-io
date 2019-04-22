@@ -5,3 +5,5 @@ export const routes = Router();
 
 routes.get('/:boothId', Booth.select);
 routes.put('/:boothId', Booth.update);
+
+routes.post('/:boothId/auth', Booth.authentication.generateKey);

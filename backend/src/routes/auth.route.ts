@@ -1,6 +1,9 @@
 import { Router } from 'express';
-import { authenticate } from '../controllers/user.controller';
+import * as User from '../controllers/user.controller';
+import * as Booth from '../controllers/booth.controller';
 
 export const routes = Router();
 
-routes.post('/login', authenticate);
+routes.post('/login', User.authenticate);
+
+routes.post('/auth-booth', Booth.authentication.authenticate);

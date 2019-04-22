@@ -93,9 +93,28 @@ export async function update(boothId: MongooseId, collaboratorId: MongooseId, op
     return await (<Document> booth).save();
 }
 
+export async function index(seminarId: MongooseId): Promise<Document> {
+    await Seminar.select(seminarId);
+    let booths = await Booth.find({ seminarId: parseId(seminarId) }).lean();
+
+    let authKeys = authentication.authKeys;
+    
+    booths.forEach((booth: any) => {
+        let authKey = authKeys[booth._id.toHexString()];
+        if (authKey) {
+            booth.key = {
+                id: authKey.key,
+                timestamp: authKey.key.getTimestamp()
+            }
+        }
+    });
+
+    return booths;
+}
+
 export namespace authentication {
 
-    const authKeys: any = {};
+    export const authKeys: any = {};
     const activeBooths: any = {};
 
     export async function authenticate(boothId: MongooseId, key: MongooseId) {
@@ -119,12 +138,12 @@ export namespace authentication {
 
     export async function generateKey(boothId: MongooseId, collaboratorId: MongooseId): Promise<Types.ObjectId> {
         boothId = parseId(boothId);
-        let boothIdString = boothId.toHexString();
+        let boothIdString = boothId.toString();
         let booth = await select(boothId);
 
         // check end time
 
-        await Seminar.collaborators.verify(booth.get('_id', Types.ObjectId), collaboratorId, { canEdit: true });
+        await Seminar.collaborators.verify(booth.get('seminarId', Types.ObjectId), collaboratorId, { canEdit: true });
     
         if (activeBooths.hasOwnProperty(boothIdString)) {
             throw new Error(`Booth <${ boothIdString }> is currently in use!`);

@@ -26,3 +26,32 @@ export async function update(req: any, res: any) {
         res.status(400).send(err.message);
     }
 }
+
+export async function index(req: any, res: any) {
+    try {
+        res.send(await Booth.index(req.params.seminarId));
+    } catch (err) {
+        res.status(400).send(err.message);
+    }
+}
+
+export namespace authentication {
+    export async function generateKey(req: any, res: any) {
+        try {
+            res.status(201).send(await Booth.authentication.generateKey(req.params.boothId, req.user._id));
+        } catch (err) {
+            res.status(400).send(err.message);
+        }
+    }
+
+    export async function authenticate(req: any, res: any) {
+        try {
+            let booth = <any> await Booth.authentication.authenticate(req.params.boothId, req.params.key);
+            req.session.boothId = booth.boothId.toHexString();
+
+            req.send(`Successfully authenticated booth ${ req.paras.boothid }.`);
+        } catch (err) {
+            res.status(400).send(err.message);
+        }
+    }
+}
