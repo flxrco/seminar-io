@@ -1,6 +1,6 @@
-import { Schema, model, Document, Types, SchemaTypes } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 import { ObjectId, MongooseId, parseId } from '../utils/model.util';
-import { select as seminarSelect, collaborators } from './seminar.model';
+import * as Seminar from './seminar.model';
 
 const BoothSchema = new Schema({
     seminarId: { type: ObjectId, required: true },
@@ -32,7 +32,7 @@ interface INewBooth {
 }
 
 export async function create(seminarId: MongooseId, collaboratorId: MongooseId, data: INewBooth): Promise<Document> {
-    await collaborators.verify(seminarId, collaboratorId, { canEdit: true });
+    await Seminar.collaborators.verify(seminarId, collaboratorId, { canEdit: true });
 
     return await Booth.create({
         seminarId: parseId(seminarId),
@@ -54,7 +54,7 @@ export async function select(boothId: MongooseId): Promise<Document> {
         throw new Error(`Booth <${ boothId.toHexString() }> does not exist.`);
     }
     
-    await seminarSelect(booth.get('seminarId'));
+    await Seminar.select(booth.get('seminarId'));
 
     return booth;
 }
@@ -79,7 +79,7 @@ interface IBoothOptions {
 
 export async function update(boothId: MongooseId, collaboratorId: MongooseId, options: IBoothOptions): Promise<Document> {
     let booth = <any> await select(boothId);
-    await collaborators.verify(booth.seminarId, collaboratorId, { canEdit: true });
+    await Seminar.collaborators.verify(booth.seminarId, collaboratorId, { canEdit: true });
 
     if (options.mode != null) {
         booth.mode = options.mode;
@@ -91,4 +91,77 @@ export async function update(boothId: MongooseId, collaboratorId: MongooseId, op
     }
 
     return await (<Document> booth).save();
+}
+
+export namespace authentication {
+
+    const authKeys: any = {};
+    const activeBooths: any = {};
+
+    export async function authenticate(boothId: MongooseId, key: MongooseId) {
+        boothId = parseId(boothId);
+        let boothIdString = boothId.toHexString();
+        let booth = await select(boothId);
+
+        // check booth end time
+
+        let authObject = authKeys[boothIdString];
+
+        if (!authObject) {
+            throw new Error(`Booth <${ boothIdString }> has not yet been given an authentication key.`);
+        }
+
+        delete authKeys[boothIdString];
+        activeBooths[boothIdString] = new Date();
+
+        return booth;
+    }
+
+    export async function generateKey(boothId: MongooseId, collaboratorId: MongooseId): Promise<Types.ObjectId> {
+        boothId = parseId(boothId);
+        let boothIdString = boothId.toHexString();
+        let booth = await select(boothId);
+
+        // check end time
+
+        await Seminar.collaborators.verify(booth.get('_id', Types.ObjectId), collaboratorId, { canEdit: true });
+    
+        if (activeBooths.hasOwnProperty(boothIdString)) {
+            throw new Error(`Booth <${ boothIdString }> is currently in use!`);
+        }
+
+        if (authKeys.hasOwnProperty(boothIdString)) {
+            authKeys[boothIdString].forceExpire();
+        }
+
+        let authKey = Types.ObjectId();
+
+        let timeout = setTimeout(() => {
+            delete authKeys[boothIdString];
+        }, 180000);
+
+        authKeys[boothIdString] = {
+            key: authKey,
+            forceExpire: () => {
+                clearTimeout(timeout);
+                delete authKeys[boothIdString];
+            }
+        }
+
+        return authKey;
+    }
+
+    export async function deauth(boothId: MongooseId): Promise<Document> {
+        boothId = parseId(boothId);
+        let boothIdString = boothId.toHexString();
+        let booth = await select(boothId);
+
+        if (!activeBooths.hasOwnProperty(boothIdString)) {
+            throw new Error(`Booth <${ boothIdString }> is not even in use at the moment.`);
+        }
+
+        delete activeBooths[boothIdString];
+
+        return booth;
+    }
 }
